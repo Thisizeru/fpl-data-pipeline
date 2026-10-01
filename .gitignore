@@ -7,3 +7,5 @@ airflow_home/
 fpl-key.pem
 fpl-key.pem.pem
 gunicorn.ctl
+airflow.cfg
+airflow_logs.txt
