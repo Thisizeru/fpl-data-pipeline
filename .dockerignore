@@ -1,0 +1,5 @@
+airflow_home/
+logs/
+__pycache__/
+*.csv
+*.json

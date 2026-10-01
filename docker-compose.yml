@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  airflow:
+    build: .
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["/home/airflow/.local/bin/airflow db migrate && /home/airflow/.local/bin/airflow api-server"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+      AIRFLOW__CORE__AUTH_MANAGER: 'airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager'
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+      AIRFLOW__API_AUTH__JWT_ISSUER: 'airflow'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow:8080/execution/'
+      AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: '120'
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: '120'
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    restart: on-failure
+
+  airflow-scheduler:
+    image: apache/airflow:3.0.0
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["/home/airflow/.local/bin/airflow db migrate && /home/airflow/.local/bin/airflow scheduler"]
+    restart: on-failure
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./Extraction_file:/opt/airflow/Extraction_file
+      - ./Transformation_file:/opt/airflow/Transformation_file
+      - ./Load_file:/opt/airflow/Load_file
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow:8080/execution/'
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+      AIRFLOW__API_AUTH__JWT_ISSUER: 'airflow'
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: '120'
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: '120'
+
+  airflow-dag-processor:
+    image: apache/airflow:3.0.0
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["/home/airflow/.local/bin/airflow db migrate && /home/airflow/.local/bin/airflow dag-processor"]
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./Extraction_file:/opt/airflow/Extraction_file
+      - ./Transformation_file:/opt/airflow/Transformation_file
+      - ./Load_file:/opt/airflow/Load_file
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow:8080/execution/'
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+      AIRFLOW__API_AUTH__JWT_ISSUER: 'airflow'
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: '120'
+      AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: '120'
+
+volumes:
+  postgres_data:

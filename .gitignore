@@ -1,0 +1,9 @@
+.env
+logs/
+__pycache__/
+*.csv
+*.json
+airflow_home/
+fpl-key.pem
+fpl-key.pem.pem
+gunicorn.ctl
