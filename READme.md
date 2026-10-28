@@ -1,10 +1,37 @@
-# FPL data pipeline for a group of fantasy league managers who wants their data available during off season too because the fantasy premier league games data are usually not accessible when the season is over 
+# FPL Data Pipeline
+
+FPL data pipeline for a group of fantasy league managers who want their data available during the off-season too, because the Fantasy Premier League games data are usually not accessible when the season is over.
 
 An automated ETL pipeline that extracts Fantasy Premier League standings, transforms the data, and loads it into PostgreSQL — orchestrated with Apache Airflow, containerized with Docker, and deployed on AWS EC2.
 
-**Live demo:** http://13.60.35.33:8080 (Airflow UI — login: `admin` / see note below)
+## Live Demo
 
-> Note: this is a portfolio project. The EC2 instance may be stopped between reviews to manage free-tier usage — reach out if the link isn't responding and I'll bring it back up.
+**[Open the live Airflow dashboard](http://13.60.35.33:8080)**
+
+**Login (read-only):** username `viewer` / password `demo-viewer-2026`
+
+Click the link, sign in with the login above, and you'll land on the Dags page. Open `fpl_pipeline` to see the graph, run history, and task logs.
+
+> Your browser may show "Not secure" because the demo runs over plain http. It is safe to continue.
+>
+> This is a portfolio project. The server may occasionally be paused to manage free-tier usage. If the link isn't responding, reach out and I'll bring it back up.
+
+## Screenshots
+## Screenshots
+
+**Pipeline architecture**
+![Pipeline architecture diagram](screenshots/fpl_pipeline_diagram.png)
+
+**Airflow Dags home page**
+![DAG list with a successful run](screenshots/dag-list.png)
+
+**Extract, process and load tasks running**
+![Pipeline graph: extract, process, load](screenshots/run-details.png)
+
+**Standings data loaded in PostgreSQL**
+![Standings data in the database, viewed in the terminal](screenshots/data.png)
+
+
 
 ## What it does
 
@@ -13,6 +40,7 @@ The pipeline runs daily but only produces new data during matchdays:
 1. **Extracts** current standings from the Fantasy Premier League API for a specific classic league
 2. **Transforms** the raw JSON into a clean, structured format (renamed columns, type validation, deduplication checks)
 3. **Loads** the result into a PostgreSQL database, ready for downstream analysis or dashboarding
+
 ## Architecture
 
 ```
@@ -28,7 +56,7 @@ FPL API → Extract (Python/requests) → Transform (pandas) → Load (PostgreSQ
 **Services running:**
 - `postgres` — stores both Airflow's metadata and the pipeline's output data
 - `airflow` — API server / web UI
-- `airflow-scheduler` — triggers the DAG on schedule (`@daily`) because the might be premier league games within the weekdays and not only weekends
+- `airflow-scheduler` — triggers the DAG on schedule (`@daily`) because there might be Premier League games within the weekdays and not only weekends
 - `airflow-dag-processor` — parses and validates the DAG file
 
 ## Tech stack
@@ -49,6 +77,7 @@ A few problems I diagnosed and fixed while building this:
 - **Wrong data in the database** — the extract step was pointed at an incorrect FPL league ID and, separately, at the wrong API endpoint (a page URL instead of the JSON API endpoint), which surfaced as a `JSONDecodeError` when the response wasn't parseable JSON.
 - **Database lock timeouts crashing the webserver** — root-caused to a stray heredoc syntax error in `init-db.sh` (a trailing space after the closing delimiter) that silently broke database initialization on certain restarts.
 - **Cross-platform deployment issues** — case-sensitivity differences between Windows and Linux (`Docker-compose.yml` vs `docker-compose.yml`) broke the first deployment attempt on the EC2 instance.
+- **Securing the public demo** — the Airflow UI initially gave every visitor admin access. I switched to Airflow's simple auth manager with separate roles, so the demo link is shared through a read-only `viewer` account while admin access stays private. I also fixed a file-permission error between the host and the container that crashed the webserver after the change.
 
 ## Running it locally
 
